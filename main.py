@@ -1,45 +1,15 @@
 # Import necessary libraries
 import tkinter as tk
-from tkinter import filedialog
+from tkinter import filedialog, Text, messagebox
 import pandas as pd
 import numpy as np
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
+from math import sqrt
 
-# Step 1: Generate Synthetic Dataset
-np.random.seed(42)
-
-num_participants = 1000
-exercises = [
-    'Malware Analysis', 'Network Security', 'Social Engineering',
-    'Incident Response'
-]
-
-data = []
-
-for participant_id in range(1, num_participants + 1):
-  for exercise in exercises:
-    # Randomly generate exercise duration, success, and additional behavioral features
-    duration_seconds = np.random.randint(60, 600)
-    success = np.random.choice([True, False])
-    knowledge_level = np.random.uniform(1, 5)
-    confidence_level = np.random.uniform(1, 5)
-    engagement_score = np.random.uniform(0, 1)
-
-    data.append({
-        'ParticipantID': participant_id,
-        'Exercise': exercise,
-        'DurationSeconds': duration_seconds,
-        'Success': success,
-        'KnowledgeLevel': knowledge_level,
-        'ConfidenceLevel': confidence_level,
-        'EngagementScore': engagement_score
-    })
-
-# Create a DataFrame and save it to a CSV file
-df = pd.DataFrame(data)
-df.to_csv('cybersecurity_data.csv', index=False)
+# Set pandas display options
+pd.set_option('display.max_columns', None)
 
 
 # Function to load and preprocess the dataset
@@ -48,11 +18,15 @@ def load_data():
   data = pd.read_csv(filename)
 
   # Feature engineering and encoding categorical features
-  features = pd.get_dummies(data[[
-      'Exercise', 'DurationSeconds', 'KnowledgeLevel', 'ConfidenceLevel',
-      'EngagementScore'
-  ]],
-                            columns=['Exercise'])
+  features = pd.get_dummies(
+      data[[
+          'Exercise', 'DurationSeconds', 'KnowledgeLevel', 'ConfidenceLevel',
+          'EngagementScore', 'PreviousExperience', 'LearningStyle',
+          'OtherExercisePerformance', 'KnowledgeConfidenceInteraction',
+          'EngagementOtherExerciseInteraction', 'TransformedKnowledgeLevel',
+          'Noise'
+      ]],
+      columns=['Exercise', 'PreviousExperience', 'LearningStyle'])
 
   # Additional features
   features['PriorSuccessRate'] = data.groupby(
@@ -78,31 +52,62 @@ def load_data():
 
   # Evaluate the model (using Mean Squared Error in this case)
   mse = mean_squared_error(y_test, predictions)
-  print(f'Mean Squared Error: {mse}')
-
-  # Calculate and print the R-squared score
+  rmse = sqrt(mse)
+  mae = mean_absolute_error(y_test, predictions)
   r2 = r2_score(y_test, predictions)
-  print(f'R-squared Score: {r2}')
+
+  # Display the evaluation metrics
+  text_area.insert(tk.END, f'Mean Squared Error: {mse}\n')
+  text_area.insert(tk.END, f'Root Mean Squared Error: {rmse}\n')
+  text_area.insert(tk.END, f'Mean Absolute Error: {mae}\n')
+  text_area.insert(tk.END, f'R-squared Score: {r2}\n')
 
   # Step 4: Make Recommendations for Participants
   # Apply the model to the entire dataset for prediction
   data['PredictedDuration'] = model.predict(features)
 
-  # Aggregate predictions per participant
-  recommendation_data = data.groupby(
-      'ParticipantID')['PredictedDuration'].mean().reset_index()
+  # Calculate additional statistics
+  data['PredictedDurationStd'] = data.groupby(
+      'ParticipantID')['PredictedDuration'].transform('std')
+  data['PredictedDurationMax'] = data.groupby(
+      'ParticipantID')['PredictedDuration'].transform('max')
+  data['PredictedDurationMin'] = data.groupby(
+      'ParticipantID')['PredictedDuration'].transform('min')
 
-  # Display recommendations
-  print("Recommendations:")
-  print(recommendation_data[['ParticipantID', 'PredictedDuration']])
+  # Aggregate predictions per participant
+  recommendation_data = data.groupby('ParticipantID').agg({
+      'PredictedDuration':
+      'mean',
+      'PredictedDurationMin':
+      'mean',
+      'PredictedDurationMax':
+      'mean',
+  }).reset_index()
+
+  # Display recommendations in the GUI
+  text_area.insert(tk.END, "Recommendations:\n")
+  text_area.insert(tk.END, recommendation_data.to_string(index=False))
 
 
 # Create the main window
 root = tk.Tk()
+root.title("C3NTR")
+root.geometry("800x600")
+
+# Create a label
+label = tk.Label(root, text="Please load your data", font=("Arial", 14))
+label.pack(pady=20)
 
 # Create a button for loading the dataset
-load_button = tk.Button(root, text="Load Data", command=load_data)
+load_button = tk.Button(root,
+                        text="Load Data",
+                        command=load_data,
+                        font=("Arial", 12))
 load_button.pack()
+
+# Create a text area for displaying the predictions
+text_area = Text(root, width=90, height=20)
+text_area.pack(pady=20)
 
 # Run the GUI
 root.mainloop()
