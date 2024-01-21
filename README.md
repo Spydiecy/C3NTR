@@ -52,7 +52,7 @@ The code is structured as follows:
 - Create a button for loading the dataset
 - Create a text area for displaying the predictions
 - Run the GUI
-- 
+  
 ## Features
 
 - **Synthetic Data Generation**: The system generates a synthetic dataset for a set number of participants and a set of cyber exercises. For each participant and exercise, it randomly generates values for exercise duration, success, knowledge level, confidence level, and engagement score.
